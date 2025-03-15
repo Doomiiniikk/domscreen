@@ -109,17 +109,7 @@ def interactive():
         except EOFError:
             sys.stdin = open("/dev/stdin")
         except KeyboardInterrupt:
-            def toHand(signum, frame):
-                raise TimeoutError
-            signal.signal(signal.SIGALRM, toHand)
-            try:
-                while 1:
-                    signal.alarm(5)
-                    response = input("\nDid you want to exit? ")
-                    signal.alarm(0)
-                    if response not in ["n", "no", "non"]:
-                        break
-            except (TimeoutError, KeyboardInterrupt):
+            if input("\nDid you want to exit? ") not in ["n", "no", "non"]:
                 break
             
 
