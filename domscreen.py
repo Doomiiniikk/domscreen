@@ -27,6 +27,11 @@ class dom_screen():
         self.server_arguments : None
         # print(self.server_dir)
     
+        if not self.m_validateScreenInstall():
+            print("Screen is not installed on your system")
+            exit(1)
+        
+    
     def summon(self):
         if self.query_sessions() == True:
             print(f"{self.server_name} is already used in another session")
@@ -68,6 +73,11 @@ class dom_screen():
             return True
         return False
     
+    def m_validateScreenInstall(self):
+        if subprocess.run("which screen", shell=True, capture_output=True).stdout.decode("utf-8") == "":
+            return False
+        return True
+            
     
     def c_help(self):
         print("""commands:
@@ -115,11 +125,11 @@ def interactive():
 
 if __name__ == "__main__":
     
+    ds = dom_screen(server_name="finsnickarna")
+
     print("\x1b[?1049h")
     print("\x1b[1;1f\x1b[2J")
-    
-    ds = dom_screen(server_name="finsnickarna")
-    
+        
     arguments : list = sys.argv[1:]
     
     if "-interactive" in arguments:
@@ -128,6 +138,7 @@ if __name__ == "__main__":
         interactive()
     
     # ended program
+    
     print("\x1b[?1049l\x1b[1A")        
     
     if "-cleanscreen" in arguments:
@@ -135,3 +146,4 @@ if __name__ == "__main__":
         print("cleaned your screen as asked")
         time.sleep(2)
         print("\x1b[1;1f\x1b[2J")
+        
