@@ -14,36 +14,33 @@ import json
 # backup system
 # Gather the correct directory automatically
 
-
-
-
 class dom_screen():
     
     def __init__(
         self,
-        server_dir = pathlib.Path(__file__).parent,
         server_name = "server"
         ) -> None:
 
         self.homeDir : pathlib.Path = pathlib.Path.home()
         self.configDir : pathlib.Path = self.homeDir.joinpath(".config/domscreen")
         self.savedServers : pathlib.Path = self.configDir.joinpath("savedServers.json")
-
+        self.server_name = server_name
+        
         if not self.homeDir.is_dir(): raise FileExistsError("This home does not exists")
         if not self.configDir.is_dir(): self.configDir.mkdir()
         if not self.savedServers.is_file(): self.savedServers.write_text("")
         
-        
-        if not self.m_checksavedServers():
-            self.m_addTosavedServers()
+        self.serverDir = self.m_validateServerName(server_name).get("path")
+        if not self.serverDir:
+            self.m_addTosavedServers(serverName=self.server_name)
             
         try:
             self.config : dict = self.m_jRead(self.savedServers)
         except json.JSONDecodeError:
             self.m_addTosavedServers()
         
-        self.server_dir = server_dir
-        self.server_name = server_name
+        
+        
         self.server_arguments : None
         # print(self.server_dir)
 
@@ -60,7 +57,8 @@ class dom_screen():
             with open(file, "r") as f:
                 return json.load(fp=f)
         except json.JSONDecodeError as e:
-            raise json.JSONDecodeError("The requested file does not contain a valid JSON structure.", e.doc, e.pos )
+            return dict({})
+            # raise json.JSONDecodeError("The requested file does not contain a valid JSON structure.", e.doc, e.pos )
 
         except PermissionError:
             raise PermissionError("domscreen does not have access to the desired file.")
@@ -89,7 +87,12 @@ class dom_screen():
         structure = {**structure, **readStructure}
         
         self.m_jWrite(file, structure)
+    
+    def m_validateServerName(self, name : str) -> dict | None:
+        """Validates if the server name is saved"""
+        return self.m_checksavedServers().get(name)
         
+    
     def m_checksavedServers(self) -> dict:
         try:
             return self.m_jRead(self.savedServers)
@@ -97,8 +100,14 @@ class dom_screen():
             print("No servers have been saved")
             return dict({}) #?#?# Okay to return an empty dict? It shouldn't be used by the program
     
-    def m_addTosavedServers(self, structure : dict | None = None) -> None:
-        if not structure:
+    def m_addTosavedServers(self,
+        serverName = None,
+        serverPath = None,
+        serverFile = None
+        ) -> None:
+        
+        
+        if not serverName:
             for x in range(0, 3):
                 serverName : str = input("What do you want to call this server? ")
                 if not serverName in self.m_jRead(self.savedServers).keys():
@@ -108,8 +117,8 @@ class dom_screen():
             else:
                 print("Couldn't get a name that isn't used, exiting.")
                 return None
-                
-                    
+            
+        if not serverPath:
             for x in range(0, 3):
                 serverPath : pathlib.Path = pathlib.Path(
                     input(
@@ -122,6 +131,7 @@ class dom_screen():
             else:
                 print("This directory does not exist, exiting")
                 return None
+        if not serverFile:
             for x in range(0, 3):
                 serverFile : pathlib.Path = pathlib.Path(input("what's the server file name? "))
                 
@@ -131,13 +141,13 @@ class dom_screen():
             else:
                 print("This file does not exist, exiting")
                 return None
+    
+        structure = dict({f"{serverName}" :
+            {"path" : f"{serverPath}",
+                "command" : f"screen -S {serverName} -d -m java -Xmx4G -jar {serverFile}"}
+            })
         
-            structure = dict({f"{serverName}" :
-                {"path" : f"{serverPath}",
-                    "command" : f"screen -S {serverName} -d -m java -Xmx4G -jar {serverFile}"}
-                })
-        
-        self.m_jWrite(self.savedServers, structure)
+        self.m_jAppend(self.savedServers, structure)
     
     def m_clearFile(self, file : pathlib.Path) -> bool:
         """Wrapper for jWrite but with an empty dictionary"""
@@ -148,8 +158,7 @@ class dom_screen():
         if self.query_sessions() == True:
             print(f"{self.server_name} is already used in another session")
             return
-        subprocess.run(f"cd {self.server_dir}", shell=True)
-        subprocess.run(f"screen -S {self.server_name} -d -m java -Xmx4G -jar server.jar", shell=True)
+        subprocess.run(f"screen -S {self.server_name} -d -m java -Xmx4G -jar server.jar", shell=True, cwd=self.serverDir)
         print(f"Created a session with name {self.server_name}")
     
     def attach(self):
@@ -190,7 +199,6 @@ class dom_screen():
             return False
         return True
             
-    
     def c_help(self):
         print("""commands:
               \rbreak : breaks the main loop
@@ -216,6 +224,8 @@ def interactive():
                     ds.kill()
                 case "detach":
                     ds.detach()
+                case "clean":
+                    cleanScreen()
                 case _:
                     ds.c_help()
         except EOFError:
@@ -223,16 +233,16 @@ def interactive():
         except KeyboardInterrupt:
             if input("\nDid you want to exit? ") not in ["n", "no", "non"]:
                 break
-            
+
+def cleanScreen():
+    print("\x1b[1;1f\x1b[2J")
 
 if __name__ == "__main__":
 
     ds = dom_screen(server_name="finsnickarna")
-    ds.m_addTosavedServers()
 
-    exit(0)
     print("\x1b[?1049h")
-    print("\x1b[1;1f\x1b[2J")
+    cleanScreen()
         
     arguments : list = sys.argv[1:]
     
@@ -246,8 +256,5 @@ if __name__ == "__main__":
     print("\x1b[?1049l\x1b[1A")        
     
     if "-cleanscreen" in arguments:
-        print("\x1b[1;1f\x1b[2J")
-        print("cleaned your screen as asked")
-        time.sleep(2)
-        print("\x1b[1;1f\x1b[2J")
+        cleanScreen()
         
