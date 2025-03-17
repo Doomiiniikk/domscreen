@@ -38,6 +38,8 @@ class dom_screen():
         except json.JSONDecodeError:
             self.m_addTosavedServers()
         
+        self.m_clearDuplicatePaths()
+        
         self.server_arguments : None
         # print(self.server_dir)
 
@@ -190,7 +192,23 @@ class dom_screen():
         
         self.m_jWrite(self.savedServers, savedServersDict)
         print(f"Removed {name} from savedServers.json")
-            
+
+    def m_clearDuplicatePaths(self):
+        """First saved server will persist"""
+        servers : dict = self.m_checksavedServers()
+        
+        seen = set()
+        copyServers : dict = {}
+        
+        for key, value in servers.items():
+            if value["path"] not in seen:
+                seen.add(value["path"])
+                copyServers[key] = value
+        
+        self.m_jWrite(self.savedServers, copyServers)
+        
+    #! # FILE CHANGES ABOVE # !#
+    
     def m_changeServer(self, name : str = "") -> None:
         if not name:
             name = input(f"Name was not given, please input one. ")
@@ -245,7 +263,11 @@ class dom_screen():
         if subprocess.run("which screen", shell=True, capture_output=True).stdout.decode("utf-8") == "":
             return False
         return True
-            
+    
+    def m_cleanup(self):
+        self.m_clearDuplicatePaths()
+        cleanScreen()
+    
     def c_help(self):
         print("""commands:
               \rbreak : breaks the main loop
@@ -253,6 +275,7 @@ class dom_screen():
               \rdetach : detaches a remotely attached screen session. Don't know its usefulness
               \rkill : sends stop command to the session, hopefully shuts the server down
               \rattach : attaches to a screen session
+              \rclean : clears the screen and removes duplicate server entries
               \rlist : lists all saved servers
               \radd : Saves a server
               \rdel : Deletes a saved server
@@ -278,7 +301,7 @@ def interactive(ds : dom_screen):
                 case "detach":
                     ds.detach()
                 case "clean":
-                    cleanScreen()
+                    ds.m_cleanup()
                 case "add":
                     ds.m_addTosavedServers()
                 case "list":
