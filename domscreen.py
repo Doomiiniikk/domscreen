@@ -6,13 +6,12 @@ import sys
 import time
 import json
 
-# todo
-# timer for startup
-# counter for kill
-# clean input and output
-# add config file with loose variable, instead of hard coded server name
-# backup system
-# Gather the correct directory automatically
+# TODO Logging system
+# TODO Answer questions
+# TODO Create README.MD
+# TODO Better mainloop i.e. interactive()
+# TODO Decide on TUI or console program
+
 
 class dom_screen():
     
@@ -26,9 +25,9 @@ class dom_screen():
         self.savedServers : pathlib.Path = self.configDir.joinpath("savedServers.json")
         self.server_name = server_name
         
-        if not self.homeDir.is_dir(): raise FileExistsError("This home does not exists")
+        if not self.homeDir.is_dir(): raise FileExistsError("This home does not exists") #? Is this proper?
         if not self.configDir.is_dir(): self.configDir.mkdir()
-        if not self.savedServers.is_file(): self.savedServers.write_text("")
+        if not self.savedServers.is_file(): self.m_jWrite(self.savedServers, dict({}))
         
         self.serverDir = self.m_validateServerName(server_name).get("path")
         if not self.serverDir:
@@ -39,23 +38,25 @@ class dom_screen():
         except json.JSONDecodeError:
             self.m_addTosavedServers()
         
-        
-        
         self.server_arguments : None
         # print(self.server_dir)
 
         if not self.m_validateScreenInstall():
             print("Screen is not installed on your system")
             exit(1)
-    ### END OF INIT ###
+            
+    #!## END OF INIT ##!#
     
     def m_jRead(self, file : pathlib.Path) -> dict:
         """Reads from a configuration file"""
         if not file.is_file(): raise FileExistsError("Path does not point to a file.")
         
         try:
-            with open(file, "r") as f:
-                return json.load(fp=f)
+            return json.loads(
+                file.read_text()
+            )
+            #with open(file, "r") as f:
+            #    return json.load(fp=f)
         except json.JSONDecodeError as e:
             return dict({})
             # raise json.JSONDecodeError("The requested file does not contain a valid JSON structure.", e.doc, e.pos )
@@ -70,9 +71,18 @@ class dom_screen():
         if not force and not isinstance(structure, dict): raise TypeError("The given configuration is not a dict and cannot be saved.")
         if not force and not structure: raise ValueError("Empty configuration cannot be saved.")
         
+        
+        
         try:
-            with open(file, "w") as f:
-                json.dump(structure, f, indent=4)
+            file.write_text(
+                json.dumps(
+                    structure,
+                    indent=4,
+                    sort_keys=True
+                )
+            )
+         #   with open(file, "w") as f:
+        #        json.dump(structure, f, indent=4)
 
         except json.JSONDecodeError as e: raise json.JSONDecodeError(
             "The requested file does not contain a valid JSON structure.", e.doc, e.pos )
@@ -86,12 +96,23 @@ class dom_screen():
         readStructure : dict = self.m_jRead(file)
         structure = {**structure, **readStructure}
         
-        self.m_jWrite(file, structure)
+        self.m_jWrite(
+            file,
+            structure
+        )
+    
+    def m_clearFile(self, file : pathlib.Path) -> bool:
+        """Wrapper for jWrite but with an empty dictionary"""
+        if self.m_jWrite(
+            file, dict({}),
+            force=True
+        ): return True
+        
+        return False
     
     def m_validateServerName(self, name : str) -> dict | None:
         """Validates if the server name is saved"""
         return self.m_checksavedServers().get(name)
-        
     
     def m_checksavedServers(self) -> dict:
         try:
@@ -99,6 +120,12 @@ class dom_screen():
         except json.JSONDecodeError:
             print("No servers have been saved")
             return dict({}) #?#?# Okay to return an empty dict? It shouldn't be used by the program
+    
+    def m_prettyCheckSavedServers(self) -> str:
+        return json.dumps(
+            self.m_checksavedServers(),
+            indent=4
+        )
     
     def m_addTosavedServers(self,
         serverName = None,
@@ -133,7 +160,9 @@ class dom_screen():
                 return None
         if not serverFile:
             for x in range(0, 3):
-                serverFile : pathlib.Path = pathlib.Path(input("what's the server file name? "))
+                serverFile : pathlib.Path = serverPath.joinpath(
+                    input("what's the server file name? ")
+                )
                 
                 if serverFile.is_file():
                     break
@@ -148,11 +177,21 @@ class dom_screen():
             })
         
         self.m_jAppend(self.savedServers, structure)
-    
-    def m_clearFile(self, file : pathlib.Path) -> bool:
-        """Wrapper for jWrite but with an empty dictionary"""
-        if self.m_jWrite(file, dict({}), force=True): return True
-        return False
+        print(f"Added {serverName} to savedServers.json")
+
+    def m_deleteFromsavedServers(self, name: str = None) -> None:
+        if not name:
+            name = input("No name was given, please enter a valid name.")
+        savedServersDict = self.m_checksavedServers()
+        if not savedServersDict.get(name):
+            print(f"{name} is not in savedServers.json")
+            return None
+        savedServersDict.pop(name)
+        
+        self.m_jWrite(self.savedServers, savedServersDict)
+        print(f"Removed {name} from savedServers.json")
+            
+        
     
     def summon(self):
         if self.query_sessions() == True:
@@ -205,10 +244,15 @@ class dom_screen():
               \rstart : Starts a server, if not already started
               \rdetach : detaches a remotely attached screen session. Don't know its usefulness
               \rkill : sends stop command to the session, hopefully shuts the server down
-              \rattach : attaches to a screen session""")
+              \rattach : attaches to a screen session
+              \rlist : lists all saved servers
+              \radd : Saves a server
+              \rdel : Deletes a saved server
+        """)
+            
 
 
-def interactive():
+def interactive(ds : dom_screen):
     print("Running in interactive mode")
     while 1:
         try:
@@ -226,12 +270,25 @@ def interactive():
                     ds.detach()
                 case "clean":
                     cleanScreen()
+                case "add":
+                    ds.m_addTosavedServers()
+                case "list":
+                    print(ds.m_prettyCheckSavedServers())
+                case "del":
+                    ds.m_deleteFromsavedServers()
                 case _:
                     ds.c_help()
         except EOFError:
-            sys.stdin = open("/dev/stdin")
+            sys.stdin = open(
+                "/dev/stdin"
+            )
         except KeyboardInterrupt:
-            if input("\nDid you want to exit? ") not in ["n", "no", "non"]:
+            if input(
+                "\nDid you want to exit? "
+                ) not in [
+                    "n", "no", "non"
+                ]:
+                
                 break
 
 def cleanScreen():
@@ -247,9 +304,9 @@ if __name__ == "__main__":
     arguments : list = sys.argv[1:]
     
     if "-interactive" in arguments:
-        interactive()
+        interactive(ds)
     else:
-        interactive()
+        interactive(ds)
     
     # ended program
     
