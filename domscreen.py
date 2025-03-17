@@ -191,7 +191,15 @@ class dom_screen():
         self.m_jWrite(self.savedServers, savedServersDict)
         print(f"Removed {name} from savedServers.json")
             
-        
+    def m_changeServer(self, name : str = "") -> None:
+        if not name:
+            name = input(f"Name was not given, please input one. ")
+            
+        if not self.m_validateServerName(name):
+            print("That server is not saved")
+            return None
+        self.server_name = name
+        print(f"Selected {name}")
     
     def summon(self):
         if self.query_sessions() == True:
@@ -248,6 +256,7 @@ class dom_screen():
               \rlist : lists all saved servers
               \radd : Saves a server
               \rdel : Deletes a saved server
+              \rswitch: switches server
         """)
             
 
@@ -276,6 +285,8 @@ def interactive(ds : dom_screen):
                     print(ds.m_prettyCheckSavedServers())
                 case "del":
                     ds.m_deleteFromsavedServers()
+                case "switch":
+                    ds.m_changeServer()
                 case _:
                     ds.c_help()
         except EOFError:
